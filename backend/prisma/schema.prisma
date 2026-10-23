@@ -1,0 +1,601 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskReviewDecision {
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RequestType {
+  LEAVE
+  EXPENSE
+  PURCHASE
+  IT_SUPPORT
+  GENERAL
+}
+
+enum RequestStatus {
+  DRAFT
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApproverType {
+  DEPARTMENT_MANAGER
+  AUTHORIZED_ADMIN
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+enum CampaignStatus {
+  DRAFT
+  PLANNED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum EventType {
+  MEETING
+  TASK_DEADLINE
+  CAMPAIGN
+  REMINDER
+  OTHER
+}
+
+enum AttendeeStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  TENTATIVE
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_DUE
+  REQUEST_SUBMITTED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  APPROVAL_REQUIRED
+  EVENT_REMINDER
+  SYSTEM
+}
+
+enum ReportType {
+  TASK_SUMMARY
+  DEPARTMENT_PERFORMANCE
+  APPROVAL_SUMMARY
+  CAMPAIGN_PERFORMANCE
+}
+
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(100)
+  code        String   @unique @db.VarChar(30)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  managerId Int?  @unique
+  manager   User? @relation("DepartmentManager", fields: [managerId], references: [id], onDelete: SetNull)
+
+  users              User[]
+  ownedProjects      Project[]           @relation("ProjectOwnerDepartment")
+  projectMemberships ProjectDepartment[]
+  tasks              Task[]
+  requests           Request[]
+  campaigns          Campaign[]
+  events             CalendarEvent[]
+
+  @@map("departments")
+}
+
+model User {
+  id                        Int         @id @default(autoincrement())
+  employeeCode              String?     @unique @db.VarChar(30)
+  firstName                 String      @db.VarChar(100)
+  lastName                  String      @db.VarChar(100)
+  email                     String      @unique @db.VarChar(191)
+  emailVerifiedAt           DateTime?
+  passwordHash              String      @db.VarChar(255)
+  phone                     String?     @db.VarChar(30)
+  avatarUrl                 String?     @db.VarChar(500)
+  jobTitle                  String?     @db.VarChar(100)
+  role                      UserRole    @default(EMPLOYEE)
+  status                    UserStatus  @default(ACTIVE)
+  departmentId              Int?
+  department                Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  canApproveManagerRequests Boolean     @default(false)
+  managedDepartment         Department? @relation("DepartmentManager")
+  assignedApprovalRequests  Request[]   @relation("AssignedRequestApprover")
+  lastLogin                 DateTime?
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+
+  createdProjects       Project[]              @relation("ProjectCreator")
+  managedProjects       Project[]              @relation("ProjectLead")
+  assignedTasksByMe     TaskAssignment[]       @relation("TaskAssigner")
+  taskReviews           TaskReview[]           @relation("TaskReviewer")
+  createdTasks          Task[]                 @relation("TaskCreator")
+  taskAssignments       TaskAssignment[]
+  taskComments          TaskComment[]
+  taskAttachments       TaskAttachment[]
+  checklistItems        TaskChecklist[]        @relation("ChecklistCreator")
+  submittedRequests     Request[]              @relation("RequestSubmitter")
+  approvalSteps         ApprovalStep[]         @relation("StepApprover")
+  approvalActions       ApprovalAction[]
+  requestAttachments    RequestAttachment[]
+  createdCampaigns      Campaign[]             @relation("CampaignCreator")
+  createdEvents         CalendarEvent[]        @relation("EventCreator")
+  eventAttendance       EventAttendee[]
+  notifications         Notification[]
+  sessions              Session[]
+  emailVerificationOtps EmailVerificationOtp[]
+  activityLogs          ActivityLog[]
+  savedReports          SavedReport[]
+
+  @@index([departmentId])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Project {
+  id                Int                 @id @default(autoincrement())
+  code              String              @unique @db.VarChar(40)
+  name              String              @db.VarChar(255)
+  description       String?             @db.Text
+  status            ProjectStatus       @default(PLANNED)
+  priority          Priority            @default(MEDIUM)
+  startDate         DateTime?
+  dueDate           DateTime?
+  completedAt       DateTime?
+  ownerDepartmentId Int
+  ownerDepartment   Department          @relation("ProjectOwnerDepartment", fields: [ownerDepartmentId], references: [id])
+  leadManagerId     Int
+  leadManager       User                @relation("ProjectLead", fields: [leadManagerId], references: [id])
+  createdById       Int
+  createdBy         User                @relation("ProjectCreator", fields: [createdById], references: [id])
+  departments       ProjectDepartment[]
+  tasks             Task[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([ownerDepartmentId, status])
+  @@index([leadManagerId])
+  @@map("projects")
+}
+
+model ProjectDepartment {
+  id           Int        @id @default(autoincrement())
+  projectId    Int
+  departmentId Int
+  joinedAt     DateTime   @default(now())
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  @@unique([projectId, departmentId])
+  @@index([departmentId])
+  @@map("project_departments")
+}
+
+model Task {
+  id           Int              @id @default(autoincrement())
+  projectId    Int
+  project      Project          @relation(fields: [projectId], references: [id])
+  title        String           @db.VarChar(255)
+  description  String?          @db.Text
+  status       TaskStatus       @default(PENDING)
+  priority     Priority         @default(MEDIUM)
+  startDate    DateTime?
+  dueDate      DateTime?
+  completedAt  DateTime?
+  progress     Int              @default(0)
+  departmentId Int
+  department   Department       @relation(fields: [departmentId], references: [id])
+  createdById  Int
+  createdBy    User             @relation("TaskCreator", fields: [createdById], references: [id])
+  campaignId   Int?
+  campaign     Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  assignments  TaskAssignment[]
+  reviews      TaskReview[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+  checklist    TaskChecklist[]
+  events       CalendarEvent[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([projectId, status])
+  @@index([departmentId, status])
+  @@index([dueDate])
+  @@index([createdById])
+  @@index([campaignId])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id           Int      @id @default(autoincrement())
+  taskId       Int
+  userId       Int
+  assignedById Int
+  assignedAt   DateTime @default(now())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy   User     @relation("TaskAssigner", fields: [assignedById], references: [id])
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([assignedById])
+  @@map("task_assignments")
+}
+
+model TaskReview {
+  id         Int                @id @default(autoincrement())
+  taskId     Int
+  reviewerId Int
+  decision   TaskReviewDecision
+  comment    String?            @db.Text
+  reviewedAt DateTime           @default(now())
+  task       Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewer   User               @relation("TaskReviewer", fields: [reviewerId], references: [id])
+
+  @@index([taskId, reviewedAt])
+  @@index([reviewerId])
+  @@map("task_reviews")
+}
+
+model TaskComment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  userId    Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@index([userId])
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id           Int      @id @default(autoincrement())
+  taskId       Int
+  uploadedById Int
+  fileName     String   @db.VarChar(255)
+  fileUrl      String   @db.VarChar(1000)
+  mimeType     String?  @db.VarChar(100)
+  fileSize     BigInt?
+  createdAt    DateTime @default(now())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@index([uploadedById])
+  @@map("task_attachments")
+}
+
+model TaskChecklist {
+  id          Int      @id @default(autoincrement())
+  taskId      Int
+  title       String   @db.VarChar(255)
+  isCompleted Boolean  @default(false)
+  position    Int      @default(0)
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("ChecklistCreator", fields: [createdById], references: [id])
+
+  @@index([taskId, position])
+  @@map("task_checklists")
+}
+
+model Request {
+  id                 Int                 @id @default(autoincrement())
+  requestNo          String              @unique @db.VarChar(50)
+  title              String              @db.VarChar(255)
+  description        String?             @db.Text
+  type               RequestType
+  status             RequestStatus       @default(DRAFT)
+  priority           Priority            @default(MEDIUM)
+  amount             Decimal?            @db.Decimal(15, 2)
+  currency           String              @default("USD") @db.VarChar(3)
+  startDate          DateTime?
+  endDate            DateTime?
+  submittedById      Int
+  submittedBy        User                @relation("RequestSubmitter", fields: [submittedById], references: [id])
+  departmentId       Int?
+  department         Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  approverType       ApproverType?
+  assignedApproverId Int?
+  assignedApprover   User?               @relation("AssignedRequestApprover", fields: [assignedApproverId], references: [id], onDelete: SetNull)
+  approvalSteps      ApprovalStep[]
+  approvalActions    ApprovalAction[]
+  attachments        RequestAttachment[]
+  submittedAt        DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([status, type])
+  @@index([submittedById])
+  @@index([departmentId])
+  @@index([assignedApproverId, status])
+  @@map("requests")
+}
+
+model ApprovalStep {
+  id           Int              @id @default(autoincrement())
+  requestId    Int
+  stepOrder    Int
+  name         String           @db.VarChar(100)
+  status       ApprovalDecision @default(PENDING)
+  approverType ApproverType
+  approverId   Int
+  approver     User             @relation("StepApprover", fields: [approverId], references: [id])
+  request      Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actions      ApprovalAction[]
+  decidedAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([requestId, stepOrder])
+  @@index([approverId, status])
+  @@map("approval_steps")
+}
+
+model ApprovalAction {
+  id        Int              @id @default(autoincrement())
+  requestId Int
+  stepId    Int
+  actorId   Int
+  action    ApprovalDecision
+  comment   String?          @db.Text
+  createdAt DateTime         @default(now())
+  request   Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  step      ApprovalStep     @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  actor     User             @relation(fields: [actorId], references: [id])
+
+  @@index([requestId, createdAt])
+  @@index([stepId])
+  @@index([actorId])
+  @@map("approval_actions")
+}
+
+model RequestAttachment {
+  id           Int      @id @default(autoincrement())
+  requestId    Int
+  uploadedById Int
+  fileName     String   @db.VarChar(255)
+  fileUrl      String   @db.VarChar(1000)
+  mimeType     String?  @db.VarChar(100)
+  fileSize     BigInt?
+  createdAt    DateTime @default(now())
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([requestId])
+  @@index([uploadedById])
+  @@map("request_attachments")
+}
+
+model Campaign {
+  id           Int              @id @default(autoincrement())
+  name         String           @db.VarChar(255)
+  description  String?          @db.Text
+  status       CampaignStatus   @default(DRAFT)
+  budget       Decimal?         @db.Decimal(15, 2)
+  currency     String           @default("USD") @db.VarChar(3)
+  startDate    DateTime?
+  endDate      DateTime?
+  departmentId Int?
+  department   Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdById  Int
+  createdBy    User             @relation("CampaignCreator", fields: [createdById], references: [id])
+  tasks        Task[]
+  metrics      CampaignMetric[]
+  events       CalendarEvent[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([status])
+  @@index([departmentId])
+  @@index([createdById])
+  @@map("campaigns")
+}
+
+model CampaignMetric {
+  id          Int      @id @default(autoincrement())
+  campaignId  Int
+  metricDate  DateTime @db.Date
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  reach       Int      @default(0)
+  spend       Decimal  @default(0) @db.Decimal(15, 2)
+  revenue     Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, metricDate])
+  @@index([metricDate])
+  @@map("campaign_metrics")
+}
+
+model CalendarEvent {
+  id           Int             @id @default(autoincrement())
+  title        String          @db.VarChar(255)
+  description  String?         @db.Text
+  type         EventType       @default(OTHER)
+  startAt      DateTime
+  endAt        DateTime
+  allDay       Boolean         @default(false)
+  location     String?         @db.VarChar(255)
+  createdById  Int
+  createdBy    User            @relation("EventCreator", fields: [createdById], references: [id])
+  departmentId Int?
+  department   Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  taskId       Int?
+  task         Task?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  campaignId   Int?
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  attendees    EventAttendee[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([startAt, endAt])
+  @@index([createdById])
+  @@index([departmentId])
+  @@index([taskId])
+  @@index([campaignId])
+  @@map("calendar_events")
+}
+
+model EventAttendee {
+  id      Int            @id @default(autoincrement())
+  eventId Int
+  userId  Int
+  status  AttendeeStatus @default(INVITED)
+  event   CalendarEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("event_attendees")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  type      NotificationType
+  title     String           @db.VarChar(255)
+  message   String           @db.Text
+  targetUrl String?          @db.VarChar(500)
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model Session {
+  id        String    @id @default(cuid()) @db.VarChar(191)
+  userId    Int
+  tokenHash String    @unique @db.VarChar(191)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(100)
+  entityId   Int?
+  details    Json?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+model SavedReport {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(150)
+  type        ReportType
+  filters     Json?
+  createdById Int
+  createdBy   User       @relation(fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([createdById])
+  @@map("saved_reports")
+}
+
+model EmailVerificationOtp {
+  id         String    @id @default(cuid()) @db.VarChar(191)
+  userId     Int
+  codeHash   String    @db.VarChar(64)
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("email_verification_otps")
+}
