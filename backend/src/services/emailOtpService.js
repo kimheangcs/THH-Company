@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { generatePasswordChangeToken } = require("../utils/generateToken");
 const prisma = require("../config/db");
 const { sendVerificationOTP } = require("../utils/emailService");
 
@@ -225,7 +226,14 @@ async function verifyOtp(userId, code) {
     });
   });
 
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   return {
+    ...(user.mustChangePassword ? {
+      requiresPasswordChange: true,
+      passwordChangeToken: generatePasswordChangeToken(user),
+      passwordChangeTokenType: "Bearer",
+      passwordChangeTokenExpiresInSeconds: 600,
+    } : { requiresPasswordChange: false }),
     message: "Email verified successfully",
     emailVerifiedAt: now,
   };

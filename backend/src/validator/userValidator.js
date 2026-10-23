@@ -108,7 +108,6 @@ function validateCreateUser(body) {
     "firstName",
     "lastName",
     "email",
-    "password",
     "phone",
     "jobTitle",
     "departmentId",
@@ -119,7 +118,6 @@ function validateCreateUser(body) {
     "firstName",
     "lastName",
     "email",
-    "password",
     "departmentId",
   ]);
 
@@ -127,13 +125,12 @@ function validateCreateUser(body) {
     firstName: stringField(body.firstName, "firstName", 100, true),
     lastName: stringField(body.lastName, "lastName", 100, true),
     email: validateEmail(body.email),
-    password: validatePassword(body.password),
     departmentId: positiveId(body.departmentId, "departmentId"),
     role: body.role === undefined ? "EMPLOYEE" : body.role,
   };
 
-  if (!ROLES.includes(data.role) || data.role === "ADMIN") {
-    badRequest("New users must have the MANAGER or EMPLOYEE role");
+  if (!ROLES.includes(data.role)) {
+    badRequest("role must be ADMIN, MANAGER or EMPLOYEE");
   }
 
   for (const [field, max] of [

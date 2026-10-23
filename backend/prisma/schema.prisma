@@ -155,6 +155,7 @@ model User {
   lastName                  String      @db.VarChar(100)
   email                     String      @unique @db.VarChar(191)
   emailVerifiedAt           DateTime?
+  mustChangePassword        Boolean     @default(false)
   passwordHash              String      @db.VarChar(255)
   phone                     String?     @db.VarChar(30)
   avatarUrl                 String?     @db.VarChar(500)

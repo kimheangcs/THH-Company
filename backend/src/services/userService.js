@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { getDefaultPassword } = require("../config/defaultPassword");
 const { Prisma } = require("@prisma/client");
 const prisma = require("../config/db");
 
@@ -231,7 +232,7 @@ async function createUser(actor, input) {
   await requireActiveDepartment(input.departmentId);
 
   const passwordHash = await bcrypt.hash(
-    input.password,
+    getDefaultPassword(),
     12
   );
 
@@ -247,6 +248,7 @@ async function createUser(actor, input) {
     departmentId: input.departmentId,
     status: "ACTIVE",
     emailVerifiedAt: null,
+    mustChangePassword: true,
     canApproveManagerRequests: false,
   };
 
@@ -639,7 +641,7 @@ async function changePassword(actor, id, password) {
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id },
-        data: { passwordHash },
+        data: { passwordHash, mustChangePassword: true },
       });
 
       await tx.session.updateMany({
