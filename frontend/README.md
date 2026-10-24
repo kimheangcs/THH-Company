@@ -74,6 +74,13 @@ review and no self-approval; the backend remains the authority for every action.
 Campaigns, calendar events and reports are not exposed by the current backend
 routers and therefore are not presented as working frontend features.
 
+Selecting an owning department in a project form automatically fills its assigned,
+active, verified manager as project lead. Switching departments updates that lead;
+if no eligible manager exists, the old selection is cleared and the form explains
+that a lead must be chosen. Existing projects keep their current lead until the
+owning department changes. Manager users remain limited to their own department
+and themselves as lead, matching backend permissions.
+
 Access tokens use platform secure storage. Email verification and password-change
 tokens stay in memory and never become stored access credentials. Server errors
 are shown inline or in feedback messages; lists include retry, refresh, loading

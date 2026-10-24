@@ -25,9 +25,22 @@ Future<List<EditField>> resourceFields(
 }) async {
   final edit = existing != null;
   Map<String, String> departments = {}, people = {}, projects = {};
+  List<Record> departmentRecords = [];
+  final departmentLeadDefaults = <String, Map<String, String?>>{};
+  final departmentHints = <String, String>{};
   if (['Projects', 'Tasks', 'People'].contains(kind)) {
     final result = await api.list('/api/departments');
-    departments = {for (final d in result.items) '${d['id']}': '${d['name']}'};
+    departmentRecords = result.items
+        .where(
+          (d) =>
+              kind != 'Projects' ||
+              (d['isActive'] != false &&
+                  (access.admin || d['id'] == access.user['departmentId'])),
+        )
+        .toList();
+    departments = {
+      for (final d in departmentRecords) '${d['id']}': '${d['name']}',
+    };
   }
   if (['Projects', 'Tasks'].contains(kind)) {
     final result = await api.list('/api/users');
@@ -44,6 +57,35 @@ Future<List<EditField>> resourceFields(
     };
     if (kind == 'Projects') {
       people['${access.user['id']}'] = '${person(access.user)} (you)';
+      final managers = {
+        for (final u in result.items)
+          if (u['role'] == 'MANAGER' &&
+              u['status'] == 'ACTIVE' &&
+              u['emailVerifiedAt'] != null)
+            '${u['id']}': u,
+        if (access.manager) '${access.user['id']}': access.user,
+      };
+      for (final department in departmentRecords) {
+        final managerId =
+            department['managerId'] ?? department['manager']?['id'];
+        final manager = managers['$managerId'];
+        final eligible =
+            manager != null &&
+            manager['departmentId'] == department['id'] &&
+            (access.admin || manager['id'] == access.user['id']);
+        departmentLeadDefaults['${department['id']}'] = {
+          'leadManagerId': eligible ? '$managerId' : null,
+        };
+        if (!eligible) {
+          departmentHints['${department['id']}'] = access.manager
+              ? 'No selectable department manager. You can only lead projects yourself.'
+              : 'No active, verified manager assigned. Choose a project lead.';
+        }
+      }
+      // Managers cannot nominate another project lead under the backend rules.
+      if (access.manager) {
+        people = {'${access.user['id']}': '${person(access.user)} (you)'};
+      }
     }
   }
   if (kind == 'Tasks') {
@@ -83,6 +125,8 @@ Future<List<EditField>> resourceFields(
           required: true,
           numeric: true,
           choices: departments,
+          selectionDefaults: departmentLeadDefaults,
+          selectionHints: departmentHints,
         ),
         EditField(
           'leadManagerId',

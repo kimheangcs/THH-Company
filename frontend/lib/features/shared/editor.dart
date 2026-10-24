@@ -8,6 +8,8 @@ class EditField {
   final String keyName, label;
   final bool required, numeric, multiple, multiline, date, secret;
   final Map<String, String>? choices;
+  final Map<String, Map<String, String?>>? selectionDefaults;
+  final Map<String, String>? selectionHints;
   const EditField(
     this.keyName,
     this.label, {
@@ -18,6 +20,8 @@ class EditField {
     this.date = false,
     this.secret = false,
     this.choices,
+    this.selectionDefaults,
+    this.selectionHints,
   });
 }
 
@@ -89,6 +93,15 @@ class _EditorState extends State<_Editor> {
         _controllers[field.keyName] = TextEditingController(
           text: value?.toString() ?? '',
         );
+      }
+    }
+    for (final field in widget.fields) {
+      final defaults = field.selectionDefaults?[_choices[field.keyName]];
+      if (defaults == null) continue;
+      for (final entry in defaults.entries) {
+        if (!widget.initial.containsKey(entry.key)) {
+          _choices[entry.key] = entry.value;
+        }
       }
     }
   }
@@ -268,11 +281,16 @@ class _EditorState extends State<_Editor> {
     if (field.choices != null) {
       final selected = _choices[field.keyName];
       return DropdownButtonFormField<String>(
+        key: ValueKey('${field.keyName}:$selected'),
         initialValue: field.choices!.containsKey(selected)
             ? selected as String?
             : null,
         isExpanded: true,
-        decoration: InputDecoration(labelText: field.label),
+        decoration: InputDecoration(
+          labelText: field.label,
+          helperText: field.selectionHints?[selected],
+          helperMaxLines: 3,
+        ),
         items: field.choices!.entries
             .map(
               (e) => DropdownMenuItem(
@@ -281,7 +299,16 @@ class _EditorState extends State<_Editor> {
               ),
             )
             .toList(),
-        onChanged: _busy ? null : (value) => _choices[field.keyName] = value,
+        onChanged: _busy
+            ? null
+            : (value) => setState(() {
+                final changed = _choices[field.keyName] != value;
+                _choices[field.keyName] = value;
+                final defaults = changed
+                    ? (field.selectionDefaults?[value])
+                    : null;
+                if (defaults != null) _choices.addAll(defaults);
+              }),
         validator: (v) => field.required && v == null
             ? 'Choose ${field.label.toLowerCase()}'
             : null,
