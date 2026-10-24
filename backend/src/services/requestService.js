@@ -269,6 +269,7 @@ async function selectApprover(tx, request, actor) {
         departmentId: request.departmentId,
         status: "ACTIVE",
         emailVerifiedAt: { not: null },
+        mustChangePassword: false,
       },
       select: { id: true },
     });
@@ -297,8 +298,10 @@ async function selectApprover(tx, request, actor) {
     where: {
       id: { not: actor.id },
       role: "ADMIN",
+      canApproveManagerRequests: true,
       status: "ACTIVE",
       emailVerifiedAt: { not: null },
+      mustChangePassword: false,
     },
     orderBy: { id: "asc" },
     select: { id: true },
@@ -619,13 +622,16 @@ async function decide(id, decision, body, actor) {
         status: true,
         emailVerifiedAt: true,
         departmentId: true,
+        canApproveManagerRequests: true,
+        mustChangePassword: true,
       },
     });
 
     if (
       !user ||
       user.status !== "ACTIVE" ||
-      !user.emailVerifiedAt
+      !user.emailVerifiedAt ||
+      user.mustChangePassword
     ) {
       throw httpError(
         403,
@@ -634,10 +640,10 @@ async function decide(id, decision, body, actor) {
     }
 
     if (request.approverType === "AUTHORIZED_ADMIN") {
-      if (user.role !== "ADMIN") {
+      if (user.role !== "ADMIN" || !user.canApproveManagerRequests) {
         throw httpError(
           403,
-          "This request requires Admin approval"
+          "This request requires an admin with approval permission"
         );
       }
     } else if (

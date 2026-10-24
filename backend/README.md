@@ -60,6 +60,34 @@ The frontend must handle both `requiresEmailVerification` and
 `requiresPasswordChange`; the backend does not issue an access token during either
 restricted stage.
 
+## Request approval permission
+
+Employee requests go to their department's configured manager. Manager and admin
+requests go to another admin with `canApproveManagerRequests: true`. Approvers
+must be active, email verified, and finished with their required password change.
+If no eligible approver exists, submission fails and the request stays a draft.
+
+An authenticated admin can grant or revoke this permission on an admin account:
+
+```http
+PATCH /api/users/:id
+Authorization: Bearer <admin-access-token>
+Content-Type: application/json
+
+{ "canApproveManagerRequests": true }
+```
+
+Use `false` to revoke it. Managers cannot change approval permission, and it
+cannot be set on manager or employee accounts. The first admin setup script grants
+the permission; additional admins start without it. Existing accounts retain their
+stored value. Both approve and reject operations recheck the permission, so revoking
+it also prevents decisions on requests already assigned to that admin. Restore the
+permission to let that admin process those pending requests. Self-approval remains
+prohibited.
+
+Admin password resets enforce the same 72 UTF-8 byte limit as initial password
+changes, including passwords containing Khmer or other multibyte characters.
+
 ## Integration tests
 
 Apply migrations to a dedicated test database, then provide its URL as

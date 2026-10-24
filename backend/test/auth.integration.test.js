@@ -19,6 +19,7 @@ test('user onboarding and session lifecycle', { skip: !process.env.TEST_DATABASE
   app.use(express.json());
   app.use('/api/auth', require('../src/router/authRoute'));
   app.use('/api/users', require('../src/router/userRoute'));
+  app.use('/api/requests', require('../src/router/requestRoute'));
   app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ message: error.message }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
@@ -34,11 +35,12 @@ test('user onboarding and session lifecycle', { skip: !process.env.TEST_DATABASE
   const suffix = crypto.randomUUID();
   const departmentIds = [];
   const userIds = [];
+  const requestIds = [];
   const personalPassword = 'PersonalPassword@2026';
   let adminToken, managerToken, employee, changeToken, accessToken;
   const createFixture = async (role, departmentId) => {
     const user = await prisma.user.create({ data: {
-      firstName: 'Integration', lastName: role, email: `${role}-${suffix}@example.test`, role,
+      firstName: 'Integration', lastName: role, email: `${role}-${crypto.randomUUID()}@example.test`, role,
       departmentId, passwordHash: await bcrypt.hash(personalPassword, 12), emailVerifiedAt: new Date(),
     } });
     userIds.push(user.id);
@@ -156,9 +158,54 @@ test('user onboarding and session lifecycle', { skip: !process.env.TEST_DATABASE
       assert.equal(login.body.token, undefined);
       assert.equal((await request('/api/auth/change-initial-password', { password: personalPassword }, login.body.passwordChangeToken)).status, 200);
     });
+    await t.test('admin reset rejects passwords over 72 UTF-8 bytes without changing the account', async () => {
+      const before = await prisma.user.findUnique({ where: { id: employee.id } });
+      const result = await request(`/api/users/${employee.id}/password`, { password: 'Aa1!' + 'ខ'.repeat(24) }, adminToken, 'PATCH');
+      assert.equal(result.status, 400);
+      const after = await prisma.user.findUnique({ where: { id: employee.id } });
+      assert.equal(after.passwordHash, before.passwordHash);
+      assert.equal(after.mustChangePassword, before.mustChangePassword);
+      const boundaryPassword = 'Aa1!' + 'ខ'.repeat(22) + 'ab';
+      assert.equal(Buffer.byteLength(boundaryPassword, 'utf8'), 72);
+      assert.equal((await request(`/api/users/${employee.id}/password`, { password: boundaryPassword }, adminToken, 'PATCH')).status, 200);
+      const reset = await prisma.user.findUnique({ where: { id: employee.id } });
+      assert.ok(await bcrypt.compare(boundaryPassword, reset.passwordHash));
+      assert.equal(reset.mustChangePassword, true);
+    });
+    await t.test('approval permission is admin-managed and enforced at assignment and decision', async () => {
+      const approver = await createFixture('ADMIN', dept.id);
+      const approverToken = (await request('/api/auth/login', { email: approver.email, password: personalPassword })).body.token;
+      assert.ok(approverToken);
+      const draft = await request('/api/requests', { title: 'Approval permission regression', type: 'GENERAL' }, managerToken);
+      assert.equal(draft.status, 201);
+      const id = draft.body.data.id;
+      requestIds.push(id);
+      assert.equal((await request(`/api/requests/${id}/submit`, {}, managerToken)).status, 400);
+      assert.equal((await prisma.request.findUnique({ where: { id } })).status, 'DRAFT');
+      assert.equal((await request(`/api/users/${employee.id}`, { canApproveManagerRequests: true }, managerToken, 'PATCH')).status, 403);
+      assert.equal((await request(`/api/users/${employee.id}`, { canApproveManagerRequests: true }, adminToken, 'PATCH')).status, 403);
+      assert.equal((await request(`/api/users/${approver.id}`, { canApproveManagerRequests: 'true' }, adminToken, 'PATCH')).status, 400);
+      assert.equal((await request(`/api/users/${approver.id}`, { canApproveManagerRequests: true }, adminToken, 'PATCH')).status, 200);
+      await prisma.user.update({ where: { id: approver.id }, data: { mustChangePassword: true } });
+      assert.equal((await request(`/api/requests/${id}/submit`, {}, managerToken)).status, 400);
+      await prisma.user.update({ where: { id: approver.id }, data: { mustChangePassword: false } });
+      const submitted = await request(`/api/requests/${id}/submit`, {}, managerToken);
+      assert.equal(submitted.status, 200);
+      assert.equal(submitted.body.data.assignedApproverId, approver.id);
+      await request(`/api/users/${approver.id}`, { canApproveManagerRequests: false }, adminToken, 'PATCH');
+      assert.equal((await request(`/api/requests/${id}/approve`, {}, approverToken)).status, 403);
+      assert.equal((await request(`/api/requests/${id}/reject`, { comment: 'No' }, approverToken)).status, 403);
+      assert.equal((await prisma.request.findUnique({ where: { id } })).status, 'PENDING');
+      assert.equal(await prisma.approvalAction.count({ where: { requestId: id } }), 0);
+      await request(`/api/users/${approver.id}`, { canApproveManagerRequests: true }, adminToken, 'PATCH');
+      assert.equal((await request(`/api/requests/${id}/approve`, {}, approverToken)).status, 200);
+      assert.equal((await prisma.request.findUnique({ where: { id } })).status, 'APPROVED');
+      assert.equal((await request(`/api/requests/${id}/approve`, {}, approverToken)).status, 409);
+    });
   } finally {
     await new Promise(resolve => server.close(resolve));
     email.sendVerificationOTP = originalSend;
+    await prisma.request.deleteMany({ where: { id: { in: requestIds } } });
     await prisma.activityLog.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.department.deleteMany({ where: { id: { in: departmentIds } } });

@@ -76,13 +76,14 @@ function validatePassword(value) {
     typeof value !== "string" ||
     value.length < 12 ||
     value.length > 72 ||
+    Buffer.byteLength(value, "utf8") > 72 ||
     !/[a-z]/.test(value) ||
     !/[A-Z]/.test(value) ||
     !/[0-9]/.test(value) ||
     !/[^A-Za-z0-9]/.test(value)
   ) {
     badRequest(
-      "Password must be 12-72 characters and include uppercase, lowercase, number and symbol"
+      "Password must be 12-72 characters, at most 72 UTF-8 bytes, and include uppercase, lowercase, number and symbol"
     );
   }
 
@@ -155,11 +156,19 @@ function validateUpdateUser(body) {
     "phone",
     "jobTitle",
     "departmentId",
+    "canApproveManagerRequests",
   ];
 
   checkKeys(body, allowed);
 
   const data = {};
+
+  if (Object.prototype.hasOwnProperty.call(body, "canApproveManagerRequests")) {
+    if (typeof body.canApproveManagerRequests !== "boolean") {
+      badRequest("canApproveManagerRequests must be a boolean");
+    }
+    data.canApproveManagerRequests = body.canApproveManagerRequests;
+  }
 
   for (const [field, max] of [
     ["employeeCode", 30],

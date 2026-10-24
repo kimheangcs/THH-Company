@@ -405,6 +405,12 @@ async function updateUser(actor, id, data) {
 
   assertCanManage(actor, target);
 
+  if (Object.prototype.hasOwnProperty.call(data, "canApproveManagerRequests")) {
+    if (actor.role !== "ADMIN" || target.role !== "ADMIN") {
+      throw httpError("Only admins can configure approval permission for admin accounts", 403);
+    }
+  }
+
   if (
     actor.role === "MANAGER" &&
     Object.prototype.hasOwnProperty.call(
@@ -449,6 +455,13 @@ async function updateUser(actor, id, data) {
       }
 
       assertCanManage(actor, current);
+
+      if (
+        Object.prototype.hasOwnProperty.call(data, "canApproveManagerRequests") &&
+        current.role !== "ADMIN"
+      ) {
+        throw httpError("Approval permission can only be configured for admin accounts", 403);
+      }
 
       if (data.departmentId !== undefined) {
         await requireActiveDepartment(
