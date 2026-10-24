@@ -1,9 +1,21 @@
 # THH Workflow mobile app
 
 Flutter workspace for Android phones, with responsive tablet and desktop layouts.
-The interface uses the bundled THH logo and its purple (`#6155FF`) branding.
+The interface uses the bundled THH logo, a purple (`#7045FF`) and lavender palette,
+soft illustrated headers, gradient actions, and rounded cards. Poppins Regular,
+Medium, SemiBold, Bold, and ExtraBold are bundled locally under `assets/fonts/`
+with the SIL Open Font License; no runtime font download is needed.
 Phone navigation keeps Home, Tasks, and Requests within reach; More opens the
 role-specific menu. The application displays live API data, not demo statistics.
+
+Login, OTP and password setup follow the supplied mobile design references.
+The profile card shows the actual name, email, account status and role badge
+(admin in gold, manager in purple, employee in blue). Admins can open their edit
+and password controls; other roles receive their supported admin-managed profile
+and password-help flows. Language and theme rows describe the current English
+and lavender interface. Google login and public signup are not advertised because
+the backend does not provide them. The login Remember me control saves an access
+session in secure storage only when selected; otherwise it stays in process memory.
 
 ## Run on Android
 

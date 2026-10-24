@@ -16,19 +16,26 @@ import 'package:thh_company_frontend/providers/auth_provider.dart';
 
 import 'test_support.dart';
 
-Future<void> capture(WidgetTester tester, String name) async {
+Future<void> capture(WidgetTester tester, String name, {Finder? target}) async {
   final directory = Platform.environment['THH_SCREENSHOTS'];
   if (directory == null) return;
   await tester.runAsync(() async {
-    await precacheImage(
-      const AssetImage('assets/images/thh_workflow_logo.png'),
-      tester.element(find.byType(MaterialApp)),
-    );
+    for (final asset in [
+      'assets/images/thh_workflow_logo.png',
+      'assets/illustrations/security.png',
+      'assets/illustrations/checklist.png',
+      'assets/illustrations/inbox.png',
+    ]) {
+      await precacheImage(
+        AssetImage(asset),
+        tester.element(find.byType(MaterialApp)),
+      );
+    }
   });
   await tester.pumpAndSettle();
   await tester.runAsync(() async {
     final boundary = tester.renderObject<RenderRepaintBoundary>(
-      find.byType(RepaintBoundary).first,
+      target ?? find.byType(RepaintBoundary).first,
     );
     final image = await boundary.toImage(pixelRatio: 2);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -40,6 +47,17 @@ Future<void> capture(WidgetTester tester, String name) async {
 
 void main() {
   setUpAll(() async {
+    final poppins = FontLoader('Poppins');
+    for (final name in [
+      'Poppins-Regular.ttf',
+      'Poppins-Medium.ttf',
+      'Poppins-SemiBold.ttf',
+      'Poppins-Bold.ttf',
+      'Poppins-ExtraBold.ttf',
+    ]) {
+      poppins.addFont(rootBundle.load('assets/fonts/$name'));
+    }
+    await poppins.load();
     final fontDirectory = Platform.environment['THH_FONT_DIRECTORY'];
     if (fontDirectory == null) return;
     for (final entry in {
