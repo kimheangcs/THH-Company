@@ -962,7 +962,7 @@ async function cancel(id, actor) {
       await createNotification({
         db: tx,
         userId: request.assignedApproverId,
-        type: "REQUEST_CANCELLED",
+        type: "SYSTEM",
         title: "Request cancelled",
         message: `Request "${request.title}" has been cancelled by its creator.`,
         targetUrl: `/requests/${requestId}`,

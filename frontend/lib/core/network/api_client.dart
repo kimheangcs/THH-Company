@@ -6,6 +6,7 @@ import '../storage/token_storage.dart';
 class ApiClient {
   final TokenStorage tokenStorage;
   late final Dio dio;
+  Future<void> Function()? onSessionExpired;
 
   ApiClient(this.tokenStorage) {
     dio = Dio(
@@ -30,6 +31,15 @@ class ApiClient {
           }
 
           handler.next(options);
+        },
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401 &&
+              error.requestOptions.path != ApiConfig.loginPath &&
+              await tokenStorage.readToken() != null) {
+            await tokenStorage.deleteToken();
+            await onSessionExpired?.call();
+          }
+          handler.next(error);
         },
       ),
     );

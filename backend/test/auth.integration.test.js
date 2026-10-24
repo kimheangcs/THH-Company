@@ -201,6 +201,16 @@ test('user onboarding and session lifecycle', { skip: !process.env.TEST_DATABASE
       assert.equal((await request(`/api/requests/${id}/approve`, {}, approverToken)).status, 200);
       assert.equal((await prisma.request.findUnique({ where: { id } })).status, 'APPROVED');
       assert.equal((await request(`/api/requests/${id}/approve`, {}, approverToken)).status, 409);
+      const cancelDraft = await request('/api/requests', { title: 'Cancellation regression', type: 'GENERAL' }, managerToken);
+      assert.equal(cancelDraft.status, 201);
+      const cancelId = cancelDraft.body.data.id;
+      requestIds.push(cancelId);
+      assert.equal((await request(`/api/requests/${cancelId}/submit`, {}, managerToken)).status, 200);
+      assert.equal((await request(`/api/requests/${cancelId}/cancel`, {}, managerToken)).status, 200);
+      assert.equal((await prisma.request.findUnique({ where: { id: cancelId } })).status, 'CANCELLED');
+      assert.equal(await prisma.approvalStep.count({ where: { requestId: cancelId, status: 'PENDING' } }), 0);
+      assert.ok(await prisma.notification.findFirst({ where: { userId: approver.id, targetUrl: `/requests/${cancelId}`, type: 'SYSTEM', title: 'Request cancelled' } }));
+
     });
   } finally {
     await new Promise(resolve => server.close(resolve));

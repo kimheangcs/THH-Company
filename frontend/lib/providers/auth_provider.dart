@@ -9,12 +9,29 @@ class AuthProvider extends ChangeNotifier {
   final ApiClient api;
   final TokenStorage storage;
 
-  AuthProvider({required this.api, required this.storage});
+  AuthProvider({
+    required this.api,
+    required this.storage,
+    Dio? verificationClient,
+  }) : _providedVerificationClient = verificationClient {
+    api.onSessionExpired = () async {
+      isAuthenticated = false;
+      user = null;
+      _clearVerification();
+      errorMessage = 'Your session expired. Please sign in again.';
+      notifyListeners();
+    };
+  }
+
+  final Dio? _providedVerificationClient;
+  bool isRestoringSession = false;
 
   bool isLoading = false;
   bool isOtpLoading = false;
   bool isAuthenticated = false;
   bool requiresEmailVerification = false;
+  bool requiresPasswordChange = false;
+  String? _passwordChangeToken;
 
   Map<String, dynamic>? user;
   String? errorMessage;
@@ -27,17 +44,19 @@ class AuthProvider extends ChangeNotifier {
 
   // Separate client: verification tokens must never be confused
   // with normal session tokens stored in secure storage.
-  late final Dio _verificationDio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    ),
-  );
+  late final Dio _verificationDio =
+      _providedVerificationClient ??
+      Dio(
+        BaseOptions(
+          baseUrl: ApiConfig.baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 15),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
 
   String? _extractToken(dynamic response) {
     if (response is! Map) return null;
@@ -85,10 +104,31 @@ class AuthProvider extends ChangeNotifier {
     _verificationToken = null;
     _verificationEmail = null;
     requiresEmailVerification = false;
+    requiresPasswordChange = false;
+    _passwordChangeToken = null;
     otpMessage = null;
   }
 
+  Future<void> refreshProfile() async {
+    try {
+      final response = await api.dio.get(ApiConfig.mePath);
+      user = _extractUser(response.data);
+      notifyListeners();
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 403) {
+        await storage.deleteToken();
+        isAuthenticated = false;
+        user = null;
+        errorMessage = api.errorMessage(error);
+        notifyListeners();
+      }
+      // An expired session is handled by ApiClient. Temporary network failures
+      // leave the last known profile available; the destination offers retry.
+    }
+  }
+
   Future<void> restoreSession() async {
+    isRestoringSession = true;
     isLoading = true;
     notifyListeners();
 
@@ -117,6 +157,7 @@ class AuthProvider extends ChangeNotifier {
       isAuthenticated = false;
     } finally {
       isLoading = false;
+      isRestoringSession = false;
       notifyListeners();
     }
   }
@@ -128,6 +169,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await storage.deleteToken();
       final response = await api.dio.post(
         ApiConfig.loginPath,
         data: {'email': email.trim(), 'password': password},
@@ -157,6 +199,11 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
+      if (body['requiresPasswordChange'] == true) {
+        _setPasswordChange(body);
+        return false;
+      }
+
       final token = _extractToken(body);
 
       if (token == null) {
@@ -172,6 +219,7 @@ class AuthProvider extends ChangeNotifier {
 
       return true;
     } catch (error) {
+      await storage.deleteToken();
       isAuthenticated = false;
       user = null;
       _clearVerification();
@@ -250,7 +298,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _verificationDio.post(
+      final response = await _verificationDio.post(
         ApiConfig.verifyEmailPath,
         data: {'code': code},
         options: _verificationOptions(),
@@ -262,7 +310,12 @@ class AuthProvider extends ChangeNotifier {
 
       isAuthenticated = false;
       user = null;
-      otpMessage = 'Email verified successfully. Please sign in.';
+      if (response.data is Map &&
+          response.data['requiresPasswordChange'] == true) {
+        _setPasswordChange(response.data as Map);
+      } else {
+        otpMessage = 'Email verified successfully. Please sign in.';
+      }
 
       return true;
     } catch (error) {
@@ -270,6 +323,50 @@ class AuthProvider extends ChangeNotifier {
           ? error.message
           : api.errorMessage(error);
 
+      return false;
+    } finally {
+      isOtpLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void _setPasswordChange(Map body) {
+    final token = body['passwordChangeToken'];
+    if (token is! String || token.isEmpty) {
+      throw const FormatException(
+        'Password change session missing. Sign in again.',
+      );
+    }
+    _passwordChangeToken = token;
+    requiresPasswordChange = true;
+    requiresEmailVerification = false;
+    isAuthenticated = false;
+    user = null;
+  }
+
+  Future<bool> changeInitialPassword(String password) async {
+    if (isOtpLoading) return false;
+    isOtpLoading = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      if (_passwordChangeToken == null) {
+        throw const FormatException('Sign in again to choose your password.');
+      }
+      await _verificationDio.post(
+        '/api/auth/change-initial-password',
+        data: {'password': password},
+        options: Options(
+          headers: {'Authorization': 'Bearer $_passwordChangeToken'},
+        ),
+      );
+      _clearVerification();
+      otpMessage = 'Password saved. Sign in with your personal password.';
+      return true;
+    } catch (error) {
+      errorMessage = error is FormatException
+          ? error.message
+          : api.errorMessage(error);
       return false;
     } finally {
       isOtpLoading = false;
