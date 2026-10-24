@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "postinstall": "prisma skills sync || exit 0"
+    "postinstall": "prisma skills sync || exit 0",
+    "seed:demo": "node scripts/seed-demo.js"
   },
   "keywords": [],
   "author": "",

@@ -1,14 +1,60 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const ink = Color(0xFF122B36);
-  static const teal = Color(0xFF6155FF);
-  static const muted = Color(0xFF6F7F86);
-  static const canvas = Color(0xFFF4F6F5);
-  static const line = Color(0xFFE3E9E6);
+  static const ink = Color(0xFF10182D);
+  static const teal = Color(0xFF7045FF);
+  static const muted = Color(0xFF858293);
+  static const canvas = Color(0xFFF7F3FF);
+  static const line = Color(0xFFEDE7F7);
 
   static ThemeData get light => ThemeData(
     useMaterial3: true,
+    fontFamily: 'Poppins',
+    textSelectionTheme: const TextSelectionThemeData(cursorColor: teal),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: const Color(0xFFFCFAFF),
+      indicatorColor: const Color(0xFFECE3FF),
+      height: 76,
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 11,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w600
+              : FontWeight.w400,
+          color: states.contains(WidgetState.selected) ? teal : muted,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          color: states.contains(WidgetState.selected) ? teal : ink,
+        ),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: const Color(0xFFFCFAFF),
+      selectedColor: const Color(0xFFECE2FF),
+      checkmarkColor: Colors.black,
+      side: const BorderSide(color: line),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      labelStyle: const TextStyle(
+        fontFamily: 'Poppins',
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Colors.black,
+      ),
+      secondaryLabelStyle: const TextStyle(
+        fontFamily: 'Poppins',
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Colors.black,
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: const Color(0xFFFCFAFF),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      surfaceTintColor: Colors.transparent,
+    ),
     colorScheme: ColorScheme.fromSeed(
       seedColor: teal,
       primary: teal,
@@ -17,24 +63,24 @@ class AppTheme {
     scaffoldBackgroundColor: canvas,
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
-        fontSize: 34,
+        fontSize: 30,
         fontWeight: FontWeight.w800,
-        letterSpacing: -1.2,
+        letterSpacing: -1.1,
         color: ink,
       ),
       headlineMedium: TextStyle(
-        fontSize: 26,
+        fontSize: 25,
         fontWeight: FontWeight.w700,
         letterSpacing: -.7,
         color: ink,
       ),
       titleLarge: TextStyle(
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: FontWeight.w700,
         color: ink,
       ),
       titleMedium: TextStyle(
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: FontWeight.w600,
         color: ink,
       ),
@@ -42,20 +88,20 @@ class AppTheme {
       bodySmall: TextStyle(fontSize: 12, height: 1.5, color: muted),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: canvas,
+      backgroundColor: Color(0xFFFCFAFF),
       foregroundColor: ink,
       surfaceTintColor: Colors.transparent,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFFF7F9F8),
+      fillColor: const Color(0xFFFCFAFF),
       contentPadding: const EdgeInsets.all(16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(17),
         borderSide: const BorderSide(color: line),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(17),
         borderSide: const BorderSide(color: line),
       ),
     ),
@@ -113,14 +159,25 @@ class Surface extends StatelessWidget {
     this.padding = const EdgeInsets.all(24),
   });
   @override
-  Widget build(BuildContext context) => Container(
-    padding: padding,
+  Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppTheme.line),
+      borderRadius: BorderRadius.circular(22),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0B7850CB),
+          blurRadius: 18,
+          offset: Offset(0, 6),
+        ),
+      ],
     ),
-    child: child,
+    child: Material(
+      color: const Color(0xFFFEFCFF),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: Colors.white.withValues(alpha: .9)),
+      ),
+      child: Padding(padding: padding, child: child),
+    ),
   );
 }
 
@@ -137,7 +194,7 @@ class StatusPill extends StatelessWidget {
       'INACTIVE',
     ].contains(status);
     final color = good
-        ? AppTheme.teal
+        ? const Color(0xFF3DA45B)
         : bad
         ? const Color(0xFFBA4E47)
         : const Color(0xFF9C711F);

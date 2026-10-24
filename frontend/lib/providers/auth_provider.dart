@@ -162,7 +162,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login({required String email, required String password}) async {
+  Future<bool> login({
+    required String email,
+    required String password,
+    bool rememberMe = true,
+  }) async {
+    storage.persistSession = rememberMe;
     isLoading = true;
     errorMessage = null;
     _clearVerification();

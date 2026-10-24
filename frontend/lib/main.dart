@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'core/design/app_theme.dart';
@@ -10,6 +12,11 @@ import 'features/workspace/workspace_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Poppins',
+    ], await rootBundle.loadString('assets/fonts/OFL.txt'));
+  });
   final storage = TokenStorage();
   runApp(
     ChangeNotifierProvider(
