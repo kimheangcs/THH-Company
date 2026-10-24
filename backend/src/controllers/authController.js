@@ -30,7 +30,7 @@ async function login(req, res, next) {
 
     return res.json({
       success: true,
-      message: "Login successful",
+      message: result.requiresPasswordChange ? "Password change required" : "Login successful",
       ...result,
     });
   } catch (error) {
@@ -91,7 +91,19 @@ async function verifyEmail(req, res, next) {
   }
 }
 
+async function changeInitialPassword(req, res, next) {
+  try {
+    const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || "");
+    if (!match) return res.status(401).json({ success: false, message: "Password change authentication required" });
+    const { validatePasswordChange } = require("../validator/userValidator");
+    const password = validatePasswordChange(req.body);
+    const result = await authService.changeInitialPassword(match[1], password);
+    return res.json({ success: true, ...result });
+  } catch (error) { next(error); }
+}
+
 module.exports = {
+  changeInitialPassword,
   login,
   me,
   logout,

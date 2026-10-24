@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const bcrypt = require("bcryptjs");
+const { getDefaultPassword } = require("../src/config/defaultPassword");
 const readline = require("readline");
 const prisma = require("../src/config/db");
 
@@ -56,17 +57,7 @@ async function main() {
     throw new Error("This email is already registered.");
   }
 
-  // Password input is visible in the terminal.
-  const password = await ask("Password (minimum 12 characters): ");
-  const confirmPassword = await ask("Confirm password: ");
-
-  if (password.length < 12) {
-    throw new Error("Password must be at least 12 characters.");
-  }
-
-  if (password !== confirmPassword) {
-    throw new Error("Passwords do not match.");
-  }
+  const password = getDefaultPassword();
 
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -85,6 +76,7 @@ async function main() {
         lastName,
         email,
         passwordHash,
+        mustChangePassword: true,
         role: "ADMIN",
         status: "ACTIVE",
         canApproveManagerRequests: true,

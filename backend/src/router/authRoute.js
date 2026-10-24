@@ -38,6 +38,20 @@ router.post(
   authController.login
 );
 
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many password change attempts. Please try again later." },
+});
+
+router.post(
+  "/change-initial-password",
+  passwordChangeLimiter,
+  authController.changeInitialPassword
+);
+
 router.get(
   "/me",
   authMiddleware,

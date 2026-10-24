@@ -76,13 +76,14 @@ function validatePassword(value) {
     typeof value !== "string" ||
     value.length < 12 ||
     value.length > 72 ||
+    Buffer.byteLength(value, "utf8") > 72 ||
     !/[a-z]/.test(value) ||
     !/[A-Z]/.test(value) ||
     !/[0-9]/.test(value) ||
     !/[^A-Za-z0-9]/.test(value)
   ) {
     badRequest(
-      "Password must be 12-72 characters and include uppercase, lowercase, number and symbol"
+      "Password must be 12-72 characters, at most 72 UTF-8 bytes, and include uppercase, lowercase, number and symbol"
     );
   }
 
@@ -108,7 +109,6 @@ function validateCreateUser(body) {
     "firstName",
     "lastName",
     "email",
-    "password",
     "phone",
     "jobTitle",
     "departmentId",
@@ -119,7 +119,6 @@ function validateCreateUser(body) {
     "firstName",
     "lastName",
     "email",
-    "password",
     "departmentId",
   ]);
 
@@ -127,13 +126,12 @@ function validateCreateUser(body) {
     firstName: stringField(body.firstName, "firstName", 100, true),
     lastName: stringField(body.lastName, "lastName", 100, true),
     email: validateEmail(body.email),
-    password: validatePassword(body.password),
     departmentId: positiveId(body.departmentId, "departmentId"),
     role: body.role === undefined ? "EMPLOYEE" : body.role,
   };
 
-  if (!ROLES.includes(data.role) || data.role === "ADMIN") {
-    badRequest("New users must have the MANAGER or EMPLOYEE role");
+  if (!ROLES.includes(data.role)) {
+    badRequest("role must be ADMIN, MANAGER or EMPLOYEE");
   }
 
   for (const [field, max] of [
@@ -158,11 +156,19 @@ function validateUpdateUser(body) {
     "phone",
     "jobTitle",
     "departmentId",
+    "canApproveManagerRequests",
   ];
 
   checkKeys(body, allowed);
 
   const data = {};
+
+  if (Object.prototype.hasOwnProperty.call(body, "canApproveManagerRequests")) {
+    if (typeof body.canApproveManagerRequests !== "boolean") {
+      badRequest("canApproveManagerRequests must be a boolean");
+    }
+    data.canApproveManagerRequests = body.canApproveManagerRequests;
+  }
 
   for (const [field, max] of [
     ["employeeCode", 30],

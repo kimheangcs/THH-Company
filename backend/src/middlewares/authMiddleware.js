@@ -58,6 +58,7 @@ async function authMiddleware(req, res, next) {
         lastName: true,
         email: true,
         emailVerifiedAt: true,
+        mustChangePassword: true,
         role: true,
         status: true,
         departmentId: true,
@@ -78,6 +79,10 @@ async function authMiddleware(req, res, next) {
         message: "Email verification required",
         requiresEmailVerification: true,
       });
+    }
+
+    if (user.mustChangePassword) {
+      return res.status(403).json({ success: false, message: "Password change required", requiresPasswordChange: true });
     }
 
     req.user = user;

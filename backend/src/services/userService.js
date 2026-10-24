@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { getDefaultPassword } = require("../config/defaultPassword");
 const { Prisma } = require("@prisma/client");
 const prisma = require("../config/db");
 
@@ -231,7 +232,7 @@ async function createUser(actor, input) {
   await requireActiveDepartment(input.departmentId);
 
   const passwordHash = await bcrypt.hash(
-    input.password,
+    getDefaultPassword(),
     12
   );
 
@@ -247,6 +248,7 @@ async function createUser(actor, input) {
     departmentId: input.departmentId,
     status: "ACTIVE",
     emailVerifiedAt: null,
+    mustChangePassword: true,
     canApproveManagerRequests: false,
   };
 
@@ -403,6 +405,12 @@ async function updateUser(actor, id, data) {
 
   assertCanManage(actor, target);
 
+  if (Object.prototype.hasOwnProperty.call(data, "canApproveManagerRequests")) {
+    if (actor.role !== "ADMIN" || target.role !== "ADMIN") {
+      throw httpError("Only admins can configure approval permission for admin accounts", 403);
+    }
+  }
+
   if (
     actor.role === "MANAGER" &&
     Object.prototype.hasOwnProperty.call(
@@ -447,6 +455,13 @@ async function updateUser(actor, id, data) {
       }
 
       assertCanManage(actor, current);
+
+      if (
+        Object.prototype.hasOwnProperty.call(data, "canApproveManagerRequests") &&
+        current.role !== "ADMIN"
+      ) {
+        throw httpError("Approval permission can only be configured for admin accounts", 403);
+      }
 
       if (data.departmentId !== undefined) {
         await requireActiveDepartment(
@@ -639,7 +654,7 @@ async function changePassword(actor, id, password) {
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id },
-        data: { passwordHash },
+        data: { passwordHash, mustChangePassword: true },
       });
 
       await tx.session.updateMany({

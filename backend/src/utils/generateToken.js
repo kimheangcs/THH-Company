@@ -30,6 +30,14 @@ function generateEmailVerificationToken(userId) {
   );
 }
 
+function generatePasswordChangeToken(user) {
+  return jwt.sign(
+    { userId: user.id, type: "password_change", passwordVersion: hashToken(user.passwordHash) },
+    process.env.JWT_SECRET,
+    { algorithm: "HS256", expiresIn: "10m" }
+  );
+}
+
 function hashToken(token) {
   return crypto
     .createHash("sha256")
@@ -38,6 +46,7 @@ function hashToken(token) {
 }
 
 module.exports = {
+  generatePasswordChangeToken,
   generateToken,
   generateEmailVerificationToken,
   hashToken,
