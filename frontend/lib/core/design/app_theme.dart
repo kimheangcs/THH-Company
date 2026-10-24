@@ -34,12 +34,20 @@ class AppTheme {
     chipTheme: ChipThemeData(
       backgroundColor: const Color(0xFFFCFAFF),
       selectedColor: const Color(0xFFECE2FF),
+      checkmarkColor: Colors.black,
       side: const BorderSide(color: line),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       labelStyle: const TextStyle(
         fontFamily: 'Poppins',
         fontSize: 12,
         fontWeight: FontWeight.w500,
+        color: Colors.black,
+      ),
+      secondaryLabelStyle: const TextStyle(
+        fontFamily: 'Poppins',
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Colors.black,
       ),
     ),
     dialogTheme: DialogThemeData(

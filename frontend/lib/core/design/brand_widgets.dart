@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-import 'app_theme.dart';
-
 class WorkflowBrand extends StatelessWidget {
   final bool compact;
   const WorkflowBrand({super.key, this.compact = false});
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      SizedBox(
+  Widget build(BuildContext context) => Semantics(
+    label: 'THH Workflow',
+    image: true,
+    child: Align(
+      alignment: Alignment.centerLeft,
+      widthFactor: 1,
+      child: SizedBox(
         width: compact ? 36 : 42,
         height: 32,
         child: ClipRect(
@@ -25,27 +26,7 @@ class WorkflowBrand extends StatelessWidget {
           ),
         ),
       ),
-      Container(
-        height: 20,
-        width: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 10),
-        color: AppTheme.muted.withValues(alpha: .4),
-      ),
-      Flexible(
-        child: Text(
-          'THH Workflow',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: compact ? 13 : 16,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.ink,
-            letterSpacing: -.5,
-          ),
-        ),
-      ),
-    ],
+    ),
   );
 }
 

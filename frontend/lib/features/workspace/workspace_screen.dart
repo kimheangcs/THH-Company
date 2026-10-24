@@ -254,28 +254,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     height: 48,
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'THH',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      'WORKFLOW',
-                      style: TextStyle(
-                        color: Color(0xFFABA6C6),
-                        fontSize: 10,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
